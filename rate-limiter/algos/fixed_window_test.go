@@ -7,40 +7,58 @@ import (
 )
 
 func TestFixedWindowRateLimiterSingleTenant(t *testing.T) {
-	requestLimit := 600
 	windowDuration := time.Minute
-	limiter := NewFixedWindowRateLimiter(requestLimit, windowDuration)
-	tenantID := "foo"
+	limiter := NewFixedWindowRateLimiter(windowDuration)
+	tests := []struct {
+		TestName        string
+		TenantID        string
+		RequestLimit    int
+		NewRequestLimit int
+	}{
+		{
+			TestName:        "Tenant foo",
+			TenantID:        "foo",
+			RequestLimit:    600,
+			NewRequestLimit: 899,
+		},
+		{
+			TestName:        "Tenant bar",
+			TenantID:        "bar",
+			RequestLimit:    300,
+			NewRequestLimit: 499,
+		},
+	}
 
-	t.Run("allow requests within limit", func(t *testing.T) {
+	for _, tt := range tests {
 		synctest.Test(t, func(t *testing.T) {
-			for i := range requestLimit {
-				allowed := limiter.Allow(tenantID)
+			limiter.SetRateLimit(tt.TenantID, tt.RequestLimit)
+			for i := range tt.RequestLimit {
+				allowed, _ := limiter.Allow(tt.TenantID)
 				if !allowed {
-					t.Errorf("Request %d not allowed", i)
+					t.Errorf("%s: Request %d not allowed", tt.TestName, i)
+				}
+			}
+			allowed, _ := limiter.Allow(tt.TenantID)
+			if allowed {
+				t.Errorf("%s: Request should not be allowed", tt.TestName)
+			}
+			time.Sleep(windowDuration)
+			for i := range tt.RequestLimit {
+				allowed, _ := limiter.Allow(tt.TenantID)
+				if !allowed {
+					t.Errorf("%s: Request %d not allowed after window reset", tt.TestName, i)
+				}
+			}
+			limiter.SetRateLimit(tt.TenantID, tt.NewRequestLimit)
+			time.Sleep(windowDuration)
+			for i := range tt.NewRequestLimit {
+				allowed, _ := limiter.Allow(tt.TenantID)
+				if !allowed {
+					t.Errorf("%s: Request %d not allowed after limit change", tt.TestName, i)
 				}
 			}
 		})
-	})
-
-	t.Run("denies requests excedding limit", func(t *testing.T) {
-		synctest.Test(t, func(t *testing.T) {
-			allowed := limiter.Allow(tenantID)
-			if allowed {
-				t.Error("Request should not be allowed")
-			}
-		})
-	})
-
-	t.Run("resets after window duration", func(t *testing.T) {
-		synctest.Test(t, func(t *testing.T) {
-			time.Sleep(windowDuration)
-			allowed := limiter.Allow(tenantID)
-			if !allowed {
-				t.Error("request should have been allowed when new window is rolled over")
-			}
-		})
-	})
+	}
 }
 
 // ============================================================================
