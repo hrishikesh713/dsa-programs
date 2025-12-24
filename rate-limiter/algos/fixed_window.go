@@ -1,3 +1,4 @@
+// Package algos implements various rate limiting algorithms.
 package algos
 
 import (
