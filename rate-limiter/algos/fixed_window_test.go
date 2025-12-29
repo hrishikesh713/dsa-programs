@@ -60,14 +60,3 @@ func TestFixedWindowRateLimiterSingleTenant(t *testing.T) {
 		})
 	}
 }
-
-// ============================================================================
-// BONUS CHALLENGES (Try these after completing the basic test!)
-// ============================================================================
-//
-// 1. Test multiple users/clients with separate rate limits
-// 2. Test concurrent requests using goroutines
-// 3. Test partial window consumption (use 2 requests, wait, use 3 more)
-// 4. Test edge cases (0 limit, negative duration, etc.)
-//
-// ============================================================================

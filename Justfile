@@ -10,7 +10,7 @@ default:
 # Example: just run two-sum --input=test.txt --verbose
 run folder *args:
     @echo "Running {{folder}}..."
-    go run ./{{folder}}/main.go {{args}}
+    @cd {{folder}} && go run main.go {{args}}
 
 # Build a specific problem
 # Usage: just build <folder-name>
