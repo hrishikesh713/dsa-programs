@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"reflect"
 	"testing"
-	"time"
 
 	"github.com/hrishikesh713/dsa-programs/rate-limiter/utils"
 )
@@ -25,26 +25,23 @@ func TestLRUAdd(t *testing.T) {
 
 	t.Run("add elements to lru cache", func(t *testing.T) {
 		r := Entity{
-			Key:       "foo",
-			Value:     "bar",
-			Timestamp: time.Now(),
+			Key:   "foo",
+			Value: "bar",
 		}
 		err := lruCache.Add(r)
 		if err != nil {
-			t.Errorf("could not add value to the cache %w", err)
+			t.Errorf("could not add value to the cache %+v", err)
 		}
 	})
 
 	t.Run("evict the elements from the cache based on a TTL", func(t *testing.T) {
-		err := lruCache.Evict(time.Now().Add(-time.Hour))
+		_ = lruCache.Evict()
 	})
 }
 
-
 type Entity struct {
-	Key       string
-	Value     string
-	Timestamp time.Time
+	Key   string
+	Value string
 }
 
 func WithMaxBytes(maxBytes int) Opt {
@@ -56,6 +53,21 @@ func WithMaxBytes(maxBytes int) Opt {
 
 func WithLogHandler(logHandler slog.Handler) Opt {
 	return func(lrucache *LRUCache) error {
+		switch v := logHandler.(type) {
+		case *slog.JSONHandler:
+			if v == nil {
+				return fmt.Errorf("pointer inside loghandler is nil")
+			}
+		default:
+			if v == nil {
+				return fmt.Errorf("interface is nil")
+			}
+			rv := reflect.ValueOf(v)
+			if rv.Kind() == reflect.Pointer && rv.IsNil() {
+				return fmt.Errorf("cannot have a nil pointer stored in interface")
+			}
+			return fmt.Errorf("value inside loghandler interface is not one that is recognized %T", v)
+		}
 		lrucache.Logger = slog.New(logHandler)
 		return nil
 	}
@@ -94,6 +106,15 @@ func NewLRUCache(size int, opts ...Opt) (*LRUCache, error) {
 }
 
 func (lc *LRUCache) Add(e Entity) error {
+	lc.Logger.Info("pushing entries into cache")
 	lc.DLL.PushBack(e)
+	return nil
+}
+
+func (lc *LRUCache) Evict() error {
+	lc.Logger.Info("evicting entries")
+	if lc.DLL.Len() > 0 {
+		lc.DLL.Remove(lc.DLL.Front())
+	}
 	return nil
 }
