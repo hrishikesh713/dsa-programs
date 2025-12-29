@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
+	"sync"
 
 	"github.com/hrishikesh713/dsa-programs/rate-limiter/utils"
 )
@@ -53,6 +54,7 @@ func WithClock(clock utils.Clock) Opt {
 }
 
 type LRUCache struct {
+	rwmu   sync.RWMutex
 	DLL    *list.List
 	Clock  utils.Clock
 	Logger *slog.Logger
@@ -76,15 +78,30 @@ func NewLRUCache(size int, opts ...Opt) (*LRUCache, error) {
 }
 
 func (lc *LRUCache) Add(e Entity) error {
+	lc.rwmu.Lock()
+	defer lc.rwmu.Unlock()
 	lc.Logger.Info("pushing entries into cache")
 	lc.DLL.PushBack(e)
 	return nil
 }
 
 func (lc *LRUCache) Evict() error {
+	lc.rwmu.Lock()
+	defer lc.rwmu.Unlock()
 	lc.Logger.Info("evicting entries")
 	if lc.DLL.Len() > 0 {
 		lc.DLL.Remove(lc.DLL.Front())
 	}
 	return nil
+}
+
+func (lc *LRUCache) Get(key string) (Entity, error) {
+	lc.rwmu.RLock()
+	defer lc.rwmu.RUnlock()
+	for e := lc.DLL.Back(); e != nil; e = e.Prev() {
+		if v, ok := e.Value.(Entity); ok && v.Key == key {
+			return v, nil
+		}
+	}
+	return Entity{}, fmt.Errorf("cannot find the value")
 }
