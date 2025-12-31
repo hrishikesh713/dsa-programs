@@ -9,9 +9,8 @@ import (
 
 func Setup() (*LRUCache, error) {
 	size := 1000
-	maxBytes := 1 << 20
 	logHandler := slog.NewJSONHandler(os.Stdout, nil)
-	c, err := NewLRUCache(size, WithMaxBytes(maxBytes), WithLogHandler(logHandler))
+	c, err := NewLRUCache(size, WithLogHandler(logHandler))
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize lrucache %with", err)
 	}
