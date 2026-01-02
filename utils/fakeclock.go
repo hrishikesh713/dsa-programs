@@ -5,11 +5,30 @@ import (
 	"time"
 )
 
-type Clock interface {
+type Clocker interface {
 	Now() time.Time
-	Advance(d time.Duration)
+	Advance(d time.Duration) time.Time
 	Sleep(d time.Duration)
-	After(d time.Duration) <-chan time.Time
+	Sub(t time.Time) time.Duration
+}
+
+type RealClock struct{}
+
+func NewRealClock() *RealClock {
+	return new(RealClock)
+}
+
+func (rc *RealClock) Now() time.Time {
+	return time.Now()
+}
+
+func (rc *RealClock) Sleep(d time.Duration) {
+	time.Sleep(d)
+}
+
+func (rc *RealClock) Advance(d time.Duration) time.Time {
+	time.Sleep(d)
+	return time.Now()
 }
 
 type FakeTimer struct {
@@ -33,11 +52,19 @@ func (fc *FakeClock) Now() time.Time {
 	return fc.Curr
 }
 
-func (fc *FakeClock) Sleep(d time.Duration) {
-	<-fc.After(d)
+func (rc *RealClock) Sub(t time.Time) time.Duration {
+	return time.Since(t)
 }
 
-func (fc *FakeClock) After(d time.Duration) <-chan time.Time {
+func (fc *FakeClock) Sleep(d time.Duration) {
+	<-fc.after(d)
+}
+
+func (fc *FakeClock) Sub(t time.Time) time.Duration {
+	return fc.Curr.Sub(t)
+}
+
+func (fc *FakeClock) after(d time.Duration) <-chan time.Time {
 	fc.mu.Lock()
 	defer fc.mu.Unlock()
 	ft := FakeTimer{Notify: make(chan time.Time, 1), SchedTime: fc.Curr.Add(d)}
@@ -45,7 +72,7 @@ func (fc *FakeClock) After(d time.Duration) <-chan time.Time {
 	return ft.Notify
 }
 
-func (fc *FakeClock) Advance(d time.Duration) {
+func (fc *FakeClock) Advance(d time.Duration) time.Time {
 	fc.mu.Lock()
 	defer fc.mu.Unlock()
 	fc.Curr = fc.Curr.Add(d)
@@ -61,4 +88,5 @@ func (fc *FakeClock) Advance(d time.Duration) {
 		}
 	}
 	fc.Timers = remaining
+	return fc.Curr
 }
